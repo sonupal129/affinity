@@ -45,13 +45,14 @@ ALLOWED_HOSTS = ["*"]
 # Application definition
 
 INSTALLED_APPS = [
+    'affiliate.apps.AffiliateConfig',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'simple_history'
+    'simple_history',
 ]
 
 MIDDLEWARE = [
@@ -134,6 +135,12 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/2.2/howto/static-files/
 
 STATIC_URL = '/static/'
+
+
+# CELERY SETTINGS
+BROKER_URL = 'redis://localhost:6379/0'
+RESULT_BACKEND = 'redis://localhost:6379/0'
+CELERY_IMPORTS = ("tasks")
 
 
 
