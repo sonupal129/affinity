@@ -129,5 +129,8 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
+# local sessions
+*.session
+
 # Local Settings
 local_settings.py

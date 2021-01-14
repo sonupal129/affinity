@@ -1,4 +1,5 @@
 amqp==5.0.2
+async-lru==1.0.2
 billiard==3.6.3.0
 celery==5.0.5
 certifi==2020.12.5
@@ -21,8 +22,12 @@ odfpy==1.4.1
 openpyxl==3.0.5
 prompt-toolkit==3.0.9
 psycopg2==2.8.6
+pyaes==1.6.1
+Pyrogram==1.1.10
+PySocks==1.7.1
 pytz==2020.5
 PyYAML==5.3.1
+redis==3.5.3
 sentry-sdk==0.19.5
 six==1.15.0
 sqlparse==0.4.1

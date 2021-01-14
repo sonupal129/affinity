@@ -1,4 +1,4 @@
-from .amzn_scraper import *
+from .scrapers import *
 
 @celery_app.task
 def drum(a,b):
