@@ -5,3 +5,5 @@ import os
 
 API_KEY = ""
 SERVER = os.getenv("SERVER", "demo")
+DEFAULT_STOPLOSS = 0.0004
+DEFAULT_TARGET = 0.0004
