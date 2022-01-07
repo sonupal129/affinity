@@ -38,7 +38,7 @@ class BackTestStrategy:
                 if signal:
                     self.push_signal_data(signal)
         self.__backtest_complete = True
-        print("backtesting has been completed, please generate report")                
+        return "backtesting has been completed, please generate report"                
 
     @property
     def backtest_complete(self):

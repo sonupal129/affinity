@@ -1,5 +1,8 @@
 import pandas as pd
+from icecream import ic
 
+
+# CODE
 class BaseStrategy:
     name = "base_strategy"
     description = ""
@@ -36,7 +39,8 @@ class BaseStrategy:
     def apply_indicator(self):
         """apply technical indicatory on dataframe for further strategy build or techni
         cal analysis"""
-        pass
+        self.dataframe["max_bid"] = self.dataframe[["bidopen","bidclose","bidlow","bidhigh"]].max(axis=1)
+        self.dataframe["min_bid"] = self.dataframe[["bidopen","bidclose","bidlow","bidhigh"]].min(axis=1)
 
     @classmethod
     def dataframe_validation_done(cls):
@@ -57,7 +61,7 @@ class BaseStrategy:
             return price + stoploss_amount
         return price - stoploss_amount
 
-    
+
     def is_valid_dataframe(self):
         if self.dataframe is None:
             raise AttributeError("dataframe value must be passed")
