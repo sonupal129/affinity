@@ -1,6 +1,6 @@
 import pandas as pd
 from icecream import ic
-
+from settings import *
 
 # CODE
 class BaseStrategy:
@@ -10,8 +10,11 @@ class BaseStrategy:
     validation_initiated = False
     
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, **kwargs) -> None:
         self.__dataframe = kwargs.get("dataframe", None)
+        self.__entry_signal = kwargs.get("signal", None)
+        self.stoploss = kwargs.get("stoploss", DEFAULT_STOPLOSS)
+        self.target = kwargs.get("target", DEFAULT_TARGET)
         if self.df_validated or self.validation_initiated:
             raise AttributeError("df_validated, or validation_initiated can not be true by default")
         if not self.name:
@@ -27,7 +30,14 @@ class BaseStrategy:
                 raise TypeError("not valid dataframe")
         self.__dataframe = dataframe.copy()
         
-    
+    @property
+    def entry_signal(self):
+        return self.__entry_signal
+
+    @entry_signal.setter
+    def entry_signal(self, signal):
+        self.__entry_signal = signal
+
     def strategy(self):
         print("this is valid")
         pass
@@ -79,3 +89,61 @@ class BaseStrategy:
         return self.strategy()
 
 
+class DefaultExitStrategy(BaseStrategy):
+    name = "default exit strategy"
+
+    def __init__(self, **kwargs) -> None:
+        print(f"running {self.__class__.name} for the evaluation")
+        super().__init__(**kwargs)
+
+    def strategy(self):
+        last_df_date = self.dataframe.tail(1).index[0]
+        target_price = self.__class__.get_target_price(self.entry_signal.entry_price, self.target, self.entry_signal.entry_signal)
+        stoploss_price = self.__class__.get_stoploss_price(self.entry_signal.entry_price, self.stoploss, self.entry_signal.entry_signal)
+        filtered_df = self.dataframe[self.entry_signal.Index:last_df_date]
+
+        def exit_price_fetcher(sl_hit_row, target_hit_row, entry_price:float, entry_type:str="BUY"):
+            entry_row = pd.DataFrame()
+            if sl_hit_row.empty and not target_hit_row.empty:
+                entry_row = target_hit_row
+            elif target_hit_row.empty and not sl_hit_row.empty:
+                entry_row = sl_hit_row
+            elif not all([target_hit_row.empty, sl_hit_row.empty]):
+                row = min(target_hit_row, sl_hit_row, key= lambda k: k.index[0])
+                entry_row = row
+            
+            # Need to check in which case rows are coming blank
+            if entry_row.empty:
+                return 0,0,0
+
+            row_output_detail = [entry_row[["bidopen","bidclose","bidlow","bidhigh"]].max(axis=1).iloc[0], entry_row[["bidopen","bidclose","bidlow","bidhigh"]].min(axis=1).iloc[0], entry_row.iloc[0].name]
+            if entry_type.upper() == "BUY":
+                if row_output_detail[0] >= target_price:
+                    del row_output_detail[1]
+                    row_output_detail.append("TG")
+                    return row_output_detail
+                elif row_output_detail[1] <= stoploss_price:
+                    del row_output_detail[0]
+                    row_output_detail.append("SL")
+                    return row_output_detail
+            elif entry_type.upper() == "SELL":
+                if row_output_detail[1] <= target_price:
+                    del row_output_detail[0]
+                    row_output_detail.append("TG")
+                    return row_output_detail
+                elif row_output_detail[0] >= stoploss_price:
+                    del row_output_detail[1]
+                    row_output_detail.append("SL")
+                    return row_output_detail
+            # need to check what else condition are left
+            return 0,0,0
+        
+        if self.entry_signal.entry_signal == "BUY":
+            target_hit = filtered_df.loc[(filtered_df["max_bid"] >= target_price)].head(1)
+            sl_hit = filtered_df.loc[(filtered_df["min_bid"] <= stoploss_price)].head(1)
+            return exit_price_fetcher(target_hit, sl_hit, self.entry_signal.entry_price, self.entry_signal.entry_signal)
+        elif self.entry_signal.entry_signal == "SELL":
+            target_hit = filtered_df.loc[(filtered_df["min_bid"]) <= target_price].head(1)
+            sl_hit = filtered_df.loc[(filtered_df["max_bid"]) >= stoploss_price].head(1)
+            return exit_price_fetcher(target_hit, sl_hit, self.entry_signal.entry_price, self.entry_signal.entry_signal)
+    
