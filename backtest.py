@@ -49,8 +49,7 @@ class BackTestStrategy:
 
     def run_exit_strategy(self, signal_df, main_df):
         exit_details = []
-        exit_strategy = self.exit_strategy()
-        # last_df_date = self.df.tail(1).index[0]
+        exit_strategy = self.exit_strategy(stoploss=self.stoploss, target=self.target)
         exit_strategy.dataframe = main_df
 
         for signal in signal_df.itertuples():
@@ -62,74 +61,7 @@ class BackTestStrategy:
         signal_df["exit_time"] = [detail[1] for detail in exit_details]
         signal_df["status"] = [detail[2] for detail in exit_details]
         return signal_df
-            # target_price = self.entry_strategy.get_target_price(signal.entry_price, self.target, signal.entry_signal)
-            # stoploss_price = self.entry_strategy.get_stoploss_price(signal.entry_price, self.stoploss, signal.entry_signal)
-            # filtered_df = main_df[signal.Index:last_df_date]
-            # if signal.entry_signal == "BUY":
-            #     target_hit = filtered_df.loc[(filtered_df["max_bid"] >= target_price)].head(1)
-            #     sl_hit = filtered_df.loc[(filtered_df["min_bid"] <= stoploss_price)].head(1)
-            #     exit_details.append(sl_target_comparer(target_hit, sl_hit, signal.entry_price, signal.entry_signal))
-            # elif signal.entry_signal == "SELL":
-            #     target_hit = filtered_df.loc[(filtered_df["min_bid"]) <= target_price].head(1)
-            #     sl_hit = filtered_df.loc[(filtered_df["max_bid"]) >= stoploss_price].head(1)
-            #     exit_details.append(sl_target_comparer(target_hit, sl_hit, signal.entry_price, signal.entry_signal))
         
-
-    # def __exit_strategy(self, signal_df, main_df):
-    #     exit_details = []
-    #     def sl_target_comparer(sl_hit_row, target_hit_row, entry_price:float, entry_type:str="BUY"):
-    #             target_price = self.entry_strategy.get_target_price(entry_price, self.target, entry_type)
-    #             stoploss_price = self.entry_strategy.get_stoploss_price(entry_price, self.stoploss, entry_type)
-
-    #             def exit_price_fetcher(row, entry_type:str="BUY"):
-    #                 row_output_detail = [row[["bidopen","bidclose","bidlow","bidhigh"]].max(axis=1).iloc[0], row[["bidopen","bidclose","bidlow","bidhigh"]].min(axis=1).iloc[0], row.iloc[0].name]
-    #                 if entry_type.upper() == "BUY":
-    #                     if row_output_detail[0] >= target_price:
-    #                         del row_output_detail[1]
-    #                         row_output_detail.append("TG")
-    #                         return row_output_detail
-    #                     elif row_output_detail[1] <= stoploss_price:
-    #                         del row_output_detail[0]
-    #                         row_output_detail.append("SL")
-    #                         return row_output_detail
-    #                 elif entry_type.upper() == "SELL":
-    #                     if row_output_detail[1] <= target_price:
-    #                         del row_output_detail[0]
-    #                         row_output_detail.append("TG")
-    #                         return row_output_detail
-    #                     elif row_output_detail[0] >= stoploss_price:
-    #                         del row_output_detail[1]
-    #                         row_output_detail.append("SL")
-    #                         return row_output_detail
-                                    
-    #             if sl_hit_row.empty and not target_hit_row.empty:
-    #                 return exit_price_fetcher(target_hit_row, entry_type)
-    #             elif target_hit_row.empty and not sl_hit_row.empty:
-    #                 return exit_price_fetcher(sl_hit_row, entry_type)
-    #             elif not all([target_hit_row.empty, sl_hit_row.empty]):
-    #                 row = min(target_hit_row, sl_hit_row, key= lambda k: k.index[0])
-    #                 return exit_price_fetcher(row, entry_type)
-    #             return 0,0,0
-
-
-    #     for signal in signal_df.itertuples():
-    #         target_price = self.entry_strategy.get_target_price(signal.entry_price, self.target, signal.entry_signal)
-    #         stoploss_price = self.entry_strategy.get_stoploss_price(signal.entry_price, self.stoploss, signal.entry_signal)
-    #         filtered_df = main_df[signal.Index:last_df_date]
-    #         if signal.entry_signal == "BUY":
-    #             target_hit = filtered_df.loc[(filtered_df["max_bid"] >= target_price)].head(1)
-    #             sl_hit = filtered_df.loc[(filtered_df["min_bid"] <= stoploss_price)].head(1)
-    #             exit_details.append(sl_target_comparer(target_hit, sl_hit, signal.entry_price, signal.entry_signal))
-    #         elif signal.entry_signal == "SELL":
-    #             target_hit = filtered_df.loc[(filtered_df["min_bid"]) <= target_price].head(1)
-    #             sl_hit = filtered_df.loc[(filtered_df["max_bid"]) >= stoploss_price].head(1)
-    #             exit_details.append(sl_target_comparer(target_hit, sl_hit, signal.entry_price, signal.entry_signal))
-        
-        # signal_df["exit_price"] = [detail[0] for detail in exit_details]
-        # signal_df["exit_time"] = [detail[1] for detail in exit_details]
-        # signal_df["status"] = [detail[2] for detail in exit_details]
-
-        # return signal_df
 
     def is_valid_signal_df(self, column_names:list, signal_df):
         signal_column = signal_df.columns
@@ -156,10 +88,10 @@ class BackTestStrategy:
         df = pd.DataFrame(cleaned_data)
         qty = self.kwargs.get("order_quantity", 0)
         conditions = [
-                (df['status'] == "SL") & (df["entry_signal"] == "BUY"),
-                (df['status'] == "TG") & (df["entry_signal"] == "BUY"),
-                (df['status'] == "SL") & (df["entry_signal"] == "SELL"),
-                (df['status'] == "TG") & (df["entry_signal"] == "SELL"),
+                ((df['status'] == "SL") | (df['status'] == "SLP")) & (df["entry_signal"] == "BUY"),
+                ((df['status'] == "TG") | (df['status'] == "TGP")) & (df["entry_signal"] == "BUY"),
+                ((df['status'] == "SL") | (df['status'] == "SLP")) & (df["entry_signal"] == "SELL"),
+                ((df['status'] == "TG") | (df['status'] == "TGP")) & (df["entry_signal"] == "SELL"),
                 ]
         values = [
                     df["exit_price"] - df["entry_price"],
