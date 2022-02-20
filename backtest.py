@@ -84,13 +84,13 @@ class BackTestStrategy:
                 continue
             else:
                 cleaned_data.append(r)
-        # df = report
-        df = pd.DataFrame(cleaned_data)
+        df = report
+        # df = pd.DataFrame(cleaned_data)
         qty = self.kwargs.get("order_quantity", 0)
         conditions = [
-                ((df['status'] == "SL") | (df['status'] == "SLP")) & (df["entry_signal"] == "BUY"),
+                ((df['status'] == "SL") | (df['status'] == "SLP") | (df['status'] == "SLPR")) & (df["entry_signal"] == "BUY"),
                 ((df['status'] == "TG") | (df['status'] == "TGP")) & (df["entry_signal"] == "BUY"),
-                ((df['status'] == "SL") | (df['status'] == "SLP")) & (df["entry_signal"] == "SELL"),
+                ((df['status'] == "SL") | (df['status'] == "SLP") | (df['status'] == "SLPR")) & (df["entry_signal"] == "SELL"),
                 ((df['status'] == "TG") | (df['status'] == "TGP")) & (df["entry_signal"] == "SELL"),
                 ]
         values = [
