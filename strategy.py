@@ -1,3 +1,4 @@
+from attr import has
 import pandas as pd
 from icecream import ic
 from settings import *
@@ -6,8 +7,6 @@ from settings import *
 class BaseStrategy:
     name = "base_strategy"
     description = ""
-    df_validated = False
-    validation_initiated = False
     
 
     def __init__(self, **kwargs) -> None:
@@ -15,8 +14,6 @@ class BaseStrategy:
         self.__entry_signal = kwargs.get("signal", None)
         self.stoploss = kwargs.get("stoploss", DEFAULT_STOPLOSS)
         self.target = kwargs.get("target", DEFAULT_TARGET)
-        if self.df_validated or self.validation_initiated:
-            raise AttributeError("df_validated, or validation_initiated can not be true by default")
         if not self.name:
             raise AttributeError("strategy name is mandatory")
     
@@ -28,6 +25,10 @@ class BaseStrategy:
     def dataframe(self, dataframe):
         if not isinstance(dataframe, pd.DataFrame):
                 raise TypeError("not valid dataframe")
+        try:
+            delattr(self, "df_validated")
+        except:
+            pass
         self.__dataframe = dataframe.copy()
         
     @property
@@ -39,23 +40,18 @@ class BaseStrategy:
         self.__entry_signal = signal
 
     def strategy(self):
-        print("this is valid")
-        pass
+        raise NotImplementedError('`strategy()` must be implemented')
     
     
     def clean_dataframe(self):
         self.dataframe = self.dataframe.dropna()
 
     def apply_indicator(self):
-        """apply technical indicatory on dataframe for further strategy build or techni
-        cal analysis"""
+        """apply technical indicatory on dataframe for further strategy build or technical analysis"""
+        
         self.dataframe["max_bid"] = self.dataframe[["bidopen","bidclose","bidlow","bidhigh"]].max(axis=1)
         self.dataframe["min_bid"] = self.dataframe[["bidopen","bidclose","bidlow","bidhigh"]].min(axis=1)
 
-    @classmethod
-    def dataframe_validation_done(cls):
-        cls.validation_initiated = True
-        cls.df_validated = True
 
     @staticmethod
     def get_target_price(price:float, target_amount:float, entry_type:str="BUY") -> float:
@@ -76,16 +72,17 @@ class BaseStrategy:
         if self.dataframe is None:
             raise AttributeError("dataframe value must be passed")
         if len(self.dataframe.index) > 50:
-            self.__class__.dataframe_validation_done()
+            setattr(self, "df_validated", True)
             self.apply_indicator()
             self.clean_dataframe()
             return True
         return False
     
     def get_signal(self):
-        if not all([self.df_validated, self.validation_initiated]) or self.dataframe is None:
-            print("please validate dataframe first by calling is_valid_dataframe function")
-            return None
+        # Need to look at it later
+        # assert hasattr(self, "df_validated"), (
+        #     "Dataframe validation not done, kindly call `is_valid_dataframe()` function first"
+        # )
         return self.strategy()
 
 
