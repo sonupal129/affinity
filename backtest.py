@@ -4,6 +4,8 @@ from settings import *
 import numpy as np
 import pandas as pd
 from icecream import ic
+from tqdm.notebook import trange, tqdm
+import time
 # Code Below
 
 class BackTestStrategy:
@@ -34,7 +36,8 @@ class BackTestStrategy:
 
     def start_backtesting(self, *args, **kwargs):
         strategy = self.entry_strategy()
-        for row_number in range(1,len(self.df)):
+        for row_number in trange(1,len(self.df)):
+            time.sleep(0.01)
             strategy.dataframe = self.df.head(row_number)
             if strategy.is_valid_dataframe():
                 signal = strategy.get_signal()
@@ -51,6 +54,7 @@ class BackTestStrategy:
         exit_details = []
         exit_strategy = self.exit_strategy(stoploss=self.stoploss, target=self.target)
         exit_strategy.dataframe = main_df
+
 
         for signal in signal_df.itertuples():
             exit_strategy.entry_signal = signal
