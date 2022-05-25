@@ -48,20 +48,19 @@ class BaseStrategy:
 
     def apply_indicator(self):
         """apply technical indicatory on dataframe for further strategy build or technical analysis"""
-        
         self.dataframe["max_bid"] = self.dataframe[["bidopen","bidclose","bidlow","bidhigh"]].max(axis=1)
         self.dataframe["min_bid"] = self.dataframe[["bidopen","bidclose","bidlow","bidhigh"]].min(axis=1)
 
 
     @staticmethod
-    def get_target_price(price:float, target_amount:float, entry_type:str="BUY") -> float:
+    def get_target_price(price:float, target_amount:float, entry_type:str="BUY"):
         """ by default entry type is buy"""
         if entry_type.upper() in ["SELL", "S"]:
             return price - target_amount
         return price + target_amount
 
     @staticmethod
-    def get_stoploss_price(price:float, stoploss_amount:float, entry_type:str="BUY") -> float:
+    def get_stoploss_price(price:float, stoploss_amount:float, entry_type:str="BUY"):
         """ by default entry type is buy"""
         if entry_type.upper() in ["SELL", "S"]:
             return price + stoploss_amount

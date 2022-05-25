@@ -35,7 +35,7 @@ class BackTestStrategy:
         return True
 
     def start_backtesting(self, *args, **kwargs):
-        strategy = self.entry_strategy()
+        strategy = self.entry_strategy(stoploss=self.stoploss, target=self.target)
         for row_number in trange(1,len(self.df)):
             time.sleep(0.01)
             strategy.dataframe = self.df.head(row_number)
@@ -54,9 +54,10 @@ class BackTestStrategy:
         exit_details = []
         exit_strategy = self.exit_strategy(stoploss=self.stoploss, target=self.target)
         exit_strategy.dataframe = main_df
-
-
-        for signal in signal_df.itertuples():
+        signal_data = signal_df.itertuples()
+        next(signal_data)
+        exit_details.append((0,0,0))
+        for signal in signal_data:
             exit_strategy.entry_signal = signal
             if exit_strategy.is_valid_dataframe():
                 exit_details.append(exit_strategy.get_signal())
