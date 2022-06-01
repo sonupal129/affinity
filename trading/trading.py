@@ -1,19 +1,36 @@
 import os, fxcmpy, json
 import pandas as pd
-from settings import *
 from datetime import datetime
+from django.core.cache import cache
+import time
 # CODE BLOCK
 class Connection:
 
     def __init__(self):
         self.token = os.getenv("FXCM_TOKEN")
-        self.connection = fxcmpy.fxcmpy(access_token=TOKEN, log_level=os.getenv("LOG_LEVEL", "error").lower(), \
+        self.__connection = None
+
+    @property
+    def connection(self):
+        # cache_obj = cache.get("connection_object")
+        # if cache_obj:
+        #     return cache_obj
+        return self.__connection
+
+    @connection.setter
+    def connection(self, con):
+        # cache.set("connection_object", con, 60*24*5)
+        self.__connection = con
+
+    def connect(self):
+        con = fxcmpy.fxcmpy(access_token=settings.TOKEN, log_level=os.getenv("LOG_LEVEL", "error").lower(), \
                             server=os.getenv("SERVER", "demo").lower())
+        while not con.is_connected():
+            con = fxcmpy.fxcmpy(access_token=settings.TOKEN, log_level=os.getenv("LOG_LEVEL", "error").lower(), \
+                            server=os.getenv("SERVER", "demo").lower())
+        self.connection = con
 
-    def __repr__(self):
-        return self.connection
-
-    def close(self):
+    def disconnect(self):
         self.connection.close()
         return True
     
@@ -26,7 +43,7 @@ class FindEntry(object):
         pass
 
     def find_entry(self, entry_strategy, df, **kwargs):
-        strategy = entry_strategy(stoploss=kwargs.get("stoploss", DEFAULT_STOPLOSS), target=kwargs.get("target", DEFAULT_TARGET) \
+        strategy = entry_strategy(stoploss=kwargs.get("stoploss"), target=kwargs.get("target") \
                     )
         strategy.dataframe = df
         strategy.is_valid_dataframe()
@@ -36,7 +53,8 @@ class FindEntry(object):
 class FindExit(FindEntry):
 
     def find_exit(self, exit_strategy, entry_signal, df, **kwargs):
-        strategy = exit_strategy(stoploss=kwargs.get("stoploss", DEFAULT_STOPLOSS), target=kwargs.get("target", DEFAULT_TARGET) \
+        entry_signal = next(pd.DataFrame(entry_signal).itertuples())
+        strategy = exit_strategy(stoploss=kwargs.get("stoploss"), target=kwargs.get("target") \
                     )
         strategy.dataframe = df
         strategy.entry_signal = entry_signal
@@ -133,20 +151,22 @@ class OrderBook:
         return True
 
 def start_entry_trading(entry,  **kwargs):
+    time.sleep(10)
     df = connection.get_candles('EUR/USD', period='m1', number=250)
     entry_signal = FindEntry(entry, df, **kwargs)
     order_book = OrderBook()
     if entry_signal:
         last_order = order_book.get_last_order()
-        if last_order_df.entry_signal == entry_signal.entry_signal and order_book.add_new_order(entry_signal):
-            print("Entry signal found placing a new order")
-            order = connection.create_entry_order(
-                        symbol='EUR/USD',
-                        is_buy=True if entry_signal.entry_signal == "BUY" else False
-                        rate=entry_signal.entry_price
-                        is_in_pips=False,
-                        time_in_force='GTD'
-                    )
+        if last_order:
+            if last_order_df.entry_signal == entry_signal.entry_signal and order_book.add_new_order(entry_signal):
+                print("Entry signal found placing a new order")
+                # order = connection.create_entry_order(
+                #             symbol='EUR/USD',
+                #             is_buy=True if entry_signal.entry_signal == "BUY" else False,
+                #             rate=entry_signal.entry_price,
+                #             is_in_pips=False,
+                #             time_in_force='GTD',
+                #         )
         else:
             if order_book.is_last_order_open():
                 pass
@@ -155,10 +175,10 @@ def start_entry_trading(entry,  **kwargs):
                     print("Entry signal found placing a new order")
                     order = connection.create_entry_order(
                         symbol='EUR/USD',
-                        is_buy=True if entry_signal.entry_signal == "BUY" else False
-                        rate=entry_signal.entry_price
+                        is_buy=True if entry_signal.entry_signal == "BUY" else False,
+                        rate=entry_signal.entry_price,
                         is_in_pips=False,
-                        time_in_force='GTD'
+                        time_in_force='GTD',
                     )
     
 

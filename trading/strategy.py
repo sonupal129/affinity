@@ -1,7 +1,5 @@
-from attr import has
 import pandas as pd
 from icecream import ic
-from settings import *
 
 # CODE
 class BaseStrategy:
@@ -12,8 +10,8 @@ class BaseStrategy:
     def __init__(self, **kwargs) -> None:
         self.__dataframe = kwargs.get("dataframe", None)
         self.__entry_signal = kwargs.get("signal", None)
-        self.stoploss = kwargs.get("stoploss", DEFAULT_STOPLOSS)
-        self.target = kwargs.get("target", DEFAULT_TARGET)
+        self.stoploss = kwargs.get("stoploss", None)
+        self.target = kwargs.get("target", None)
         if not self.name:
             raise AttributeError("strategy name is mandatory")
     

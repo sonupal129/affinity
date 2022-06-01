@@ -129,3 +129,12 @@ CACHES = {
         }
     }
 }
+
+
+# FXCM TOKEN
+TOKEN = "5b6de8dc3b260ab0fab6e007bf21c43ee4fc7a27"
+
+
+# Trading Settings
+DEFAULT_STOPLOSS = 0.0004
+DEFAULT_TARGET = 0.0008
