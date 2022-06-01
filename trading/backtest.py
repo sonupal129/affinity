@@ -1,6 +1,5 @@
 from authenticate import CreateConnection
 from strategy import *
-from settings import *
 import numpy as np
 import pandas as pd
 from icecream import ic
@@ -14,8 +13,8 @@ class BackTestStrategy:
         self.entry_strategy = entry_strategy
         self.exit_strategy = kwargs.get("exit_strategy", DefaultExitStrategy)
         self.df = dataframe.copy()
-        self.stoploss = kwargs.get("stoploss", DEFAULT_STOPLOSS)
-        self.target = kwargs.get("target", DEFAULT_TARGET)
+        self.stoploss = kwargs.get("stoploss")
+        self.target = kwargs.get("target")
         self.kwargs = kwargs
         self.__backtest_complete = False
         self.__report = pd.DataFrame()
