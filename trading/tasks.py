@@ -1,11 +1,18 @@
 from celery import Celery
-
-app = Celery('tasks', broker='redis://localhost:6379')
-
-@app.task
-def add(x, y):
-    return x + y
+from celery.schedules import crontab
 
 
+
+app = Celery('tasks', broker='redis://redis:6379')
+
+
+# Celery Tasks Schedule
+
+# app.conf.beat_schedule = {
+#     "start_trade": {
+#         'task': 'start_trade',
+#         'schedule': crontab(minute='*/3', day_of_week='mon,tue,wed,thu,fri'),
+#     }
+# }
 
 

@@ -1,9 +1,16 @@
-import os, fxcmpy, json
+import os, fxcmpy, json, logging, requests
+import datetime
+import time as gtime
+from trading.strategy import SMAExitLevel1, SMAStrategy3Level1
+from trading.models import *
 import pandas as pd
-from datetime import datetime
-from django.core.cache import cache
 import time
+
 # CODE BLOCK
+
+TOKEN = "5b6de8dc3b260ab0fab6e007bf21c43ee4fc7a27"
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s', datefmt='%d-%b-%y %H:%M:%S')
 class Connection:
 
     def __init__(self):
@@ -12,30 +19,29 @@ class Connection:
 
     @property
     def connection(self):
-        # cache_obj = cache.get("connection_object")
-        # if cache_obj:
-        #     return cache_obj
-        return self.__connection
+        if self.__connection and self.__connection.is_connected():
+            return self.__connection
+        return self.connect()
 
     @connection.setter
     def connection(self, con):
-        # cache.set("connection_object", con, 60*24*5)
         self.__connection = con
 
     def connect(self):
-        con = fxcmpy.fxcmpy(access_token=settings.TOKEN, log_level=os.getenv("LOG_LEVEL", "error").lower(), \
+        con = fxcmpy.fxcmpy(access_token=TOKEN, log_level=os.getenv("LOG_LEVEL", "error").lower(), \
                             server=os.getenv("SERVER", "demo").lower())
         while not con.is_connected():
-            con = fxcmpy.fxcmpy(access_token=settings.TOKEN, log_level=os.getenv("LOG_LEVEL", "error").lower(), \
+            con = fxcmpy.fxcmpy(access_token=TOKEN, log_level=os.getenv("LOG_LEVEL", "error").lower(), \
                             server=os.getenv("SERVER", "demo").lower())
         self.connection = con
+        logging.info('Connection established with server')
+        logging.debug(con)
+        return con
 
     def disconnect(self):
         self.connection.close()
         return True
     
-
-# connection = Connection()
 
 class FindEntry(object):
 
@@ -65,130 +71,186 @@ class FindExit(FindEntry):
 
 class OrderBook:
 
-    def __init__(self):
-        self.book_name = f"order_book_{str(datetime.today().date())}.json"
-
-    def _update_order_book(self, data:list=None):
-        default_data = {
-            "book_date": str(datetime.today().date()),
-            "orders": data
-        }
-        with open(self.book_name, "w+") as order_book:
-            json.dump(default_data, order_book, default=str)
-        return True
-
-    def add_new_order(self, entry_order, order_type="ENTRY", exit_signal=None):
-        if not os.path.exists(self.book_name):
-           self._update_order_book()
-        else:
-            book_data = self.read_order_book()
-            
-            if not book_data:
-                book_data = {
-                    entry_order.time : [
-                        entry_order,
-                        order_type,
-                        exit_signal
-                    ]
-                }
-                self._update_order_book(book_data)
+    @staticmethod
+    def update_order(entry_order, order_type="entry", exit_signal=None):
+        _entry_order = next(pd.DataFrame(entry_order).itertuples())
+        if order_type.lower() == "entry" and (datetime.datetime.strptime(str(_entry_order.Index), '%Y-%m-%d %H:%M:%S') + datetime.timedelta(minutes=5)) >= datetime.datetime.today():
+            order, is_created = Order.objects.get_or_create(
+                order_time=_entry_order.Index
+            )
+            if is_created:
+                logging.info('Order has been created for new entry')
+                logging.info('Updating order information')
+                order._entry = OrderBook.jsonize_entry(entry_order)
+                order.save()
                 return True
-            else:
-                if order_type.lower() == "entry":
-                    if is_order_in_book(entry_order):
-                        return False
-                    book_data[entry_order.time] = [
-                        entry_order,
-                        order_type,
-                        exit_signal
-                    ]
-                    self._update_order_book(book_data)
-                    return True
-                elif order_type.lower() == "exit":
-                    if is_order_in_book(entry_order):
-                        order = order_book[entry_order.time]
-                        if order[2] == exit_signal:
-                            return False
-                        book_data[entry_order.time] = [
-                            entry_order,
-                            order_type,
-                            exit_signal
-                        ]
-                        self._update_order_book(book_data)
-                        return True
-                    return False
             return False
-                    
+        if exit_signal:
+            logging.info('exit signal details updaing')
+            order = Order.objects.get(order_time=_entry_order.Index)
+            if order.has_exit_signal:
+                return False
+            order.exit_price, order.exit_time, order.pl_status = exit_signal
+            order.exit_price = str(order.exit_price)
+            order.save()
+            return False
+            
+    @staticmethod
+    def jsonize_entry(entry_order):
+        output = {}
+        for name, tdata in entry_order.items():
+            tstamp = list(tdata.keys())[0]
+            value = list(tdata.values())[0]
+            output[name] = {str(tstamp): value}
+        return output
 
-    def read_order_book(self):
-        if not os.path.exists(self.book_name):
-            self._update_order_book()
-        with open(self.book_name, "r") as order_book:
-            book = json.load(order_book)
-        return book["orders"]
-
-    def is_order_in_book(self, entry_order):
-        book_data = self.read_order_book()
-        if book_data:
-            if entry_order.time in book_data.keys():
-                True
+    @staticmethod
+    def last_order():
+        return Order.objects.order_by("-order_time").first()
+        
+    @staticmethod
+    def is_last_order_open():
+        last_order = OrderBook.last_order()
+        if last_order:
+            return False if last_order.has_exit_signal else True
         return False
 
-    def get_last_order(self):
-        if not os.path.exists(self.book_name):
-            return None
-        book_data = self.read_order_book()
-        if not book_data:
-            return None
-        else:
-            pass
-            # Put code for sorting
-        
-    def is_last_order_open(self):
-        last_order = self.get_last_order()
-        if last_order[2]:
-            return False
-        return True
 
-def start_entry_trading(entry,  **kwargs):
-    time.sleep(10)
-    df = connection.get_candles('EUR/USD', period='m1', number=250)
-    entry_signal = FindEntry(entry, df, **kwargs)
-    order_book = OrderBook()
-    if entry_signal:
-        last_order = order_book.get_last_order()
-        if last_order:
-            if last_order_df.entry_signal == entry_signal.entry_signal and order_book.add_new_order(entry_signal):
-                print("Entry signal found placing a new order")
-                # order = connection.create_entry_order(
-                #             symbol='EUR/USD',
-                #             is_buy=True if entry_signal.entry_signal == "BUY" else False,
-                #             rate=entry_signal.entry_price,
-                #             is_in_pips=False,
-                #             time_in_force='GTD',
-                #         )
-        else:
-            if order_book.is_last_order_open():
-                pass
+class Trader(object):
+    __connection = Connection().connect()
+
+    def __init__(self, **kwargs):
+        print("Initiating Connection....")
+        for key, value in kwargs.items():
+            setattr(self, key, value)
+
+    def start_entry_trading(self, entry_strategy,  **kwargs):
+        entry_signal = FindEntry().find_entry(entry_strategy, **kwargs)
+        order_book = OrderBook()
+        order = None
+        if entry_signal:
+            _entry_signal = next(pd.DataFrame(entry_signal).itertuples())
+            last_order = order_book.last_order()
+            AMOUNT = kwargs.get("AMOUNT", 5) # this is lot size
+            pip_profit = kwargs.get("pip_profit", 0.004)
+            LIMIT_PRICE = _entry_signal.entry_price + pip_profit if _entry_signal.entry_signal == "BUY" else _entry_signal.entry_price - pip_profit
+            if last_order and order_book.is_last_order_open():
+                last_order_df = next(pd.DataFrame(last_order.entry).itertuples())
+                if last_order_df.entry_signal == _entry_signal.entry_signal and order_book.update_order(entry_signal):
+                    logging.info("Entry signal found placing a new order")
+                    order = self.__connection.create_entry_order(
+                                symbol='EUR/USD',
+                                is_buy=True if _entry_signal.entry_signal == "BUY" else False,
+                                amount=AMOUNT,
+                                order_type="Entry",
+                                rate=_entry_signal.entry_price,
+                                limit=LIMIT_PRICE,
+                                is_in_pips=False,
+                                time_in_force='GTC',
+                            )
+                elif last_order_df.entry_signal != _entry_signal.entry_signal:
+                    if order_book.update_order(entry_signal):
+                        logging.info(f"Sending Order for {entry_signal}")
+    #                 Comment in below code when exit signal function is ready
+                        order = self.__connection.create_entry_order(
+                                symbol='EUR/USD',
+                                is_buy=True if _entry_signal.entry_signal == "BUY" else False,
+                                amount=AMOUNT,
+                                order_type="Entry",
+                                rate=_entry_signal.entry_price,
+                                limit=LIMIT_PRICE,
+                                is_in_pips=False,
+                                time_in_force='GTC',
+                            )
             else:
-                if order_book.add_new_order(entry_signal):
-                    print("Entry signal found placing a new order")
-                    order = connection.create_entry_order(
-                        symbol='EUR/USD',
-                        is_buy=True if entry_signal.entry_signal == "BUY" else False,
-                        rate=entry_signal.entry_price,
-                        is_in_pips=False,
-                        time_in_force='GTD',
-                    )
-    
+                if order_book.update_order(entry_signal):
+                    logging.info("Entry signal found placing a new order!....")
+                    order = self.__connection.create_entry_order(
+                                symbol='EUR/USD',
+                                is_buy=True if _entry_signal.entry_signal == "BUY" else False,
+                                amount=AMOUNT,
+                                order_type="Entry",
+                                rate=_entry_signal.entry_price,
+                                limit=LIMIT_PRICE,
+                                is_in_pips=False,
+                                time_in_force='GTC',
+                            )
+            if order:
+                if OrderBook.last_order():
+                    od = OrderBook.last_order()
+                    od.orderId = order.get_orderId()
+                    od.save()
+                    logging.info("Order placed successfully!")
+        else:
+            logging.info("no signal found for entry")
 
 
+    def close_order(self, order_obj, exit_signal:list):
+        if not order_obj.has_exit_signal and exit_signal != (0,0,0):
+            order = self.__connection.get_order(order_obj.orderId)
+            tradeId = order.get_tradeId()
+            if tradeId:
+                request_data = {
+                    "trade_id": tradeId,
+                    "amount": order.get_associated_trade().get_amount(),
+                    "order_type": "AtMarket",
+                    "time_in_force": "FOK",
+                    "rate": exit_signal[0],
+                    "at_market": 0
+                }
+                logging.info('order closing data: %s' % request_data)
+                res = requests.post('%s:443/%s' % (self.__connection.trading_url, "trading/close_trade") ,headers=self.__connection.request_headers, data=request_data)
+            else:
+                logging.info("Order not created yet")
 
 
-
-
-    
-
+    def start_exit_trading(self, exit_strategy, **kwargs):
+        order_book = OrderBook()
+        last_order = order_book.last_order()
+        open_orders = [order for order in Order.objects.filter(order_time__date=datetime.datetime.today().date()) if not order.has_exit_signal]
         
+        for order in open_orders:
+            exit_signal = FindExit().find_exit(exit_strategy, order.entry, **kwargs)
+            _entry_signal = next(pd.DataFrame(order.entry).itertuples())
+            if exit_signal != (0,0,0):
+                logging.info("Exit signal found placing a exit order")
+                self.close_order(order, exit_signal)
+                order.exit_price, order.exit_time, order.pl_status = exit_signal
+                order.exit_price = str(order.exit_price)
+                order.save()
+                return order
+            else:
+                logging.info(f"no exit signal found aginst entry: {order.entry}")
 
 
+    def start_trading(self):
+        while datetime.datetime.today().isoweekday() in list(range(1,6)):
+            try:
+                today_date = datetime.datetime.today()
+                start_time = datetime.time(0,10)
+                end_time = datetime.time(20,49)
+                start_trading = False
+                if today_date.isoweekday() in list(range(1,6)):
+                    if today_date.isoweekday() == 1 and today_date.time() > start_time:
+                        logging.info("it is a trading day")
+                        start_trading = True
+                    elif today_date.isoweekday() == 5 and today_date.time() > end_time:
+                        start_trading = False
+                    else:
+                        logging.info("it is a trading day")
+                        start_trading = True
+
+                if start_trading:
+                    logging.info("permitted for trading")
+                    logging.info("sleeping for next 25 seconds")
+                    gtime.sleep(25)
+                    df = self.__connection.get_candles('EUR/USD', period='m1', number=250)
+                    logging.info("candles data fetched successfully!")
+                    logging.info("last candle updated of time frame %s" % df.iloc[-1].name)
+                    self.start_entry_trading(SMAStrategy3Level1, stoploss=self.stoploss, target=self.target, df=df)
+                    self.start_exit_trading(SMAExitLevel1, stoploss=self.stoploss, target=self.target, df=df)
+            except Exception as e:
+                logging.debug(str(e))
+                logging.error(e)
+                logging.info(e)
+                continue

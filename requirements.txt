@@ -27,8 +27,11 @@ decorator==5.1.0
 defusedxml==0.7.1
 diff-match-patch==20200713
 Django==2.2
+django-environ==0.8.1
 django-extensions==3.1.0
 django-import-export==2.5.0
+django-jsonfield==1.4.1
+django-redis==5.2.0
 django-simple-history==2.12.0
 entrypoints==0.3
 et-xmlfile==1.0.1
@@ -95,6 +98,7 @@ pyzmq==22.3.0
 redis==3.5.3
 requests==2.26.0
 rsa==4.7
+schedule==1.1.0
 Send2Trash==1.8.0
 sentry-sdk==0.19.5
 six==1.16.0

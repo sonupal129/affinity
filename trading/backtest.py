@@ -1,5 +1,4 @@
-from authenticate import CreateConnection
-from strategy import *
+from trading.strategy import *
 import numpy as np
 import pandas as pd
 from icecream import ic
