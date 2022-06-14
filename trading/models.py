@@ -5,12 +5,20 @@ import pandas as pd
 # Code Block
 
 class Order(models.Model):
+    STATUS_ENUM = {
+        ("SL", "SL"),
+        ("SLPR", "SLPR"),
+        ("TG", "TGP"),
+        ("CANCELLED", "CANCELLED")
+    }
+
     order_time = models.DateTimeField(unique=True, db_index=True)
     _entry = jsonfield.JSONField(default={})
     exit_time = models.DateTimeField(blank=True, null=True)
     exit_price = models.CharField(blank=True, null=True, max_length=10)
-    pl_status = models.CharField(blank=True, null=True, max_length=10)
+    pl_status = models.CharField(blank=True, null=True, max_length=10, choices=STATUS_ENUM)
     orderId = models.PositiveIntegerField(blank=True, null=True)
+    tradeId = models.PositiveIntegerField(blank=True, null=True)
 
 
     @property
@@ -28,8 +36,12 @@ class Order(models.Model):
 
     @property
     def entry_type(self):
-        return list(self.entry["entry_signal"].values())[0]
+        if self.entry:
+            return list(self.entry["entry_signal"].values())[0]
 
     @property
     def entry_price(self):
-        return list(self.entry["entry_price"].values())[0]
+        if self.entry:
+            return list(self.entry["entry_price"].values())[0]
+
+    
