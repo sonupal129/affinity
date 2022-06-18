@@ -167,7 +167,7 @@ class Trader(object):
         order_book = OrderBook()
         order = None
         if entry_signal:
-            print("Entry Signal Data %s" % (entry_signal))
+            print("Latest Entry Signal Data %s" % (entry_signal))
             _entry_signal = next(pd.DataFrame(entry_signal).itertuples())
             last_order = order_book.last_order()
             AMOUNT = kwargs.get("AMOUNT", 5) # this is lot size
@@ -312,7 +312,7 @@ class Trader(object):
         """
         for order in Order.objects.filter(tradeId=None, pl_status=None).exclude(orderId=None):
             fxcm_order = self.__connection.get_order(order.orderId)
-            if fxcm_order.get_associated_trade() == None and order.order_time + datetime.timedelta(minutes=30) <= timezone.now():
+            if fxcm_order.get_associated_trade() == None and order.order_time + datetime.timedelta(minutes=15) <= timezone.now():
                 print(f"deleting order {order.__dict__}")
                 self.__connection.delete_order(order.orderId)
                 order.exit_time = order.order_time
