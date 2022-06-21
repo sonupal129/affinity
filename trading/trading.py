@@ -148,16 +148,21 @@ class Trader(object):
     
     def create_order(self, **kwargs):
         last_row = self.__connection.get_last_price('EUR/USD')
-        print(kwargs)
+        up_range = kwargs["rate"] + 0.00003
+        down_range = kwargs["rate"] - 0.00003
         if kwargs["is_buy"] == True:
             if last_row["Bid"] < kwargs["rate"]: 
                 kwargs["order_type"] = "AtMarket"
+                return self.__connection.open_trade(**kwargs)
+            elif down_range < last_row["Bid"] < up_range:
                 return self.__connection.open_trade(**kwargs)
             else:
                 return self.__connection.create_entry_order(**kwargs)
         if kwargs["is_buy"] == False:
             if last_row["Bid"] > kwargs["rate"]:
                 kwargs["order_type"] = "AtMarket"
+                return self.__connection.open_trade(**kwargs)
+            elif up_range > last_row["Bid"] > down_range:
                 return self.__connection.open_trade(**kwargs)
             else:
                 return self.__connection.create_entry_order(**kwargs)
