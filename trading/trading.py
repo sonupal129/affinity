@@ -1,4 +1,7 @@
 import os, fxcmpy, json, logging, requests, schedule
+from typing import final
+from socketIO_client.exceptions import ConnectionError
+from fxcmpy import ServerError
 import datetime
 from django.utils import timezone
 # import time as gtime
@@ -35,7 +38,6 @@ class Connection:
         # while not con.is_connected():
         #     print("Unable to build connection trying again")
         #     con = self.connect()
-
         return self.connect()
 
     @connection.setter
@@ -276,7 +278,13 @@ class Trader(object):
                 if start_trading:
                     print("permitted for trading")
                     print("fetching data from server")
-                    df = self.__connection.get_candles('EUR/USD', period='m1', number=250)
+                    try:
+                        df = self.__connection.get_candles('EUR/USD', period='m1', number=250)
+                    except ServerError:
+                        self.__connection = Connection().connect()
+                    except ConnectionError:
+                        self.__connection = Connection().connect()
+                    
                     print("candles data fetched successfully!")
                     print("last candle: %s" % df.iloc[-1])
                     self.start_entry_trading(SMAStrategy3Level1, stoploss=self.stoploss, target=self.target, df=df)

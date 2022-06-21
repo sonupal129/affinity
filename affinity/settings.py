@@ -26,7 +26,7 @@ SECRET_KEY = ')_4oed^l^_4ibhrj1m6)(a4#k=k5-l$17qr^%0-8!jo!o$6&ux'
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = env.bool("DEBUG", default=True)
 
-USE_PSQL = env.bool("USER_PSQL", default=False)
+USE_PSQL = env.bool("USE_PSQL", default=False)
 
 ALLOWED_HOSTS = ["*"]
 
