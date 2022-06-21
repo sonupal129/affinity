@@ -1,7 +1,6 @@
 import os, fxcmpy, json, logging, requests, schedule
-from typing import final
 from socketIO_client.exceptions import ConnectionError
-from fxcmpy import ServerError
+from fxcmpy.fxcmpy import ServerError
 import datetime
 from django.utils import timezone
 # import time as gtime
@@ -29,15 +28,12 @@ class Connection:
     def __init__(self):
         self.token = os.getenv("FXCM_TOKEN")
         self.__connection = None
+      
 
     @property
     def connection(self):
         if self.__connection and self.__connection.is_connected():
             return self.__connection
-        # con = self.connect()
-        # while not con.is_connected():
-        #     print("Unable to build connection trying again")
-        #     con = self.connect()
         return self.connect()
 
     @connection.setter
@@ -50,12 +46,31 @@ class Connection:
     def connect(self):
         con = fxcmpy.fxcmpy(access_token=TOKEN, log_level=os.getenv("LOG_LEVEL", "error").lower(), \
                             server=os.getenv("SERVER", "demo").lower())
+        sleeper_counter = 0
         while not con.is_connected():
-            con = fxcmpy.fxcmpy(access_token=TOKEN, log_level=os.getenv("LOG_LEVEL", "error").lower(), \
-                            server=os.getenv("SERVER", "demo").lower())
-        self.connection = con
+            print("Sleeping for 5 seconds")
+            time.sleep(5)
+            if sleeper_counter >= 100:
+                print("Unable to established connection!")
+                break
+            try:
+                con = fxcmpy.fxcmpy(access_token=TOKEN, log_level=os.getenv("LOG_LEVEL", "error").lower(), \
+                                server=os.getenv("SERVER", "demo").lower())
+                print('Connection established with server')
+                print(con)
+                self.connection = con
+                return con
+            except ServerError as sr:
+                print(sr)
+                sleeper_counter += 5
+                continue
+            except Exception as e:
+                print(e)
+                sleeper_counter += 5
+                continue
         print('Connection established with server')
         print(con)
+        self.connection = con
         return con
 
     def disconnect(self):
@@ -205,11 +220,6 @@ class Trader(object):
                 if order_book.update_order(entry_signal):
                     print("Entry signal found placing a new order!....")
                     order = self.create_order(**data)
-            # print("creating a order")
-            # order = self.create_order(**data)
-            # print(order)
-            # print(dir(order))
-            # print(order.get_orderId())
             if order:
                 if OrderBook.last_order():
                     od = OrderBook.last_order()
@@ -284,7 +294,9 @@ class Trader(object):
                         self.__connection = Connection().connect()
                     except ConnectionError:
                         self.__connection = Connection().connect()
-                    
+                    except Exception:
+                        self.__connection = Connection().connect()
+
                     print("candles data fetched successfully!")
                     print("last candle: %s" % df.iloc[-1])
                     self.start_entry_trading(SMAStrategy3Level1, stoploss=self.stoploss, target=self.target, df=df)
