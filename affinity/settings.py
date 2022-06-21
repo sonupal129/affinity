@@ -26,6 +26,8 @@ SECRET_KEY = ')_4oed^l^_4ibhrj1m6)(a4#k=k5-l$17qr^%0-8!jo!o$6&ux'
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = env.bool("DEBUG", default=True)
 
+USE_PSQL = env.bool("USER_PSQL", default=False)
+
 ALLOWED_HOSTS = ["*"]
 
 
@@ -83,7 +85,7 @@ DATABASES = {
     }
 }
 
-if not DEBUG and env.str("DATABASE_URL", default=None):
+if not DEBUG or USE_PSQL and env.str("DATABASE_URL", default=None):
     DATABASES = {
         'default': env.db()
     }

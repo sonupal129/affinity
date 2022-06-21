@@ -257,12 +257,6 @@ class Trader(object):
 
 
     def start_trading(self):
-        # dummy code
-        # try:
-        #     print(Order.objects.all())
-        # except:
-        #     pass
-        # dummy code
         if datetime.datetime.today().isoweekday() in list(range(1,6)):
             try:
                 today_date = datetime.datetime.today()
