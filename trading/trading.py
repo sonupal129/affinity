@@ -50,7 +50,7 @@ class Connection:
         while not con.is_connected():
             print("Sleeping for 5 seconds")
             time.sleep(5)
-            if sleeper_counter >= 100:
+            if sleeper_counter >= 20:
                 print("Unable to established connection!")
                 break
             try:
@@ -172,6 +172,7 @@ class Trader(object):
                 kwargs["order_type"] = "AtMarket"
                 return self.__connection.open_trade(**kwargs)
             elif down_range < last_row["Bid"] < up_range:
+                kwargs["order_type"] = "AtMarket"
                 return self.__connection.open_trade(**kwargs)
             else:
                 return self.__connection.create_entry_order(**kwargs)
@@ -180,6 +181,7 @@ class Trader(object):
                 kwargs["order_type"] = "AtMarket"
                 return self.__connection.open_trade(**kwargs)
             elif up_range > last_row["Bid"] > down_range:
+                kwargs["order_type"] = "AtMarket"
                 return self.__connection.open_trade(**kwargs)
             else:
                 return self.__connection.create_entry_order(**kwargs)
