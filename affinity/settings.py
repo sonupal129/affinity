@@ -10,6 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/2.2/ref/settings/
 """
 
+
 import os, environ
 env = environ.Env()
 
@@ -27,6 +28,7 @@ SECRET_KEY = ')_4oed^l^_4ibhrj1m6)(a4#k=k5-l$17qr^%0-8!jo!o$6&ux'
 DEBUG = env.bool("DEBUG", default=True)
 
 USE_PSQL = env.bool("USE_PSQL", default=False)
+REMOTE_DB = env.bool("REMOTE_DB", default=False)
 
 ALLOWED_HOSTS = ["*"]
 
@@ -90,6 +92,17 @@ if not DEBUG or USE_PSQL and env.str("DATABASE_URL", default=None):
         'default': env.db()
     }
 
+# if REMOTE_DB:
+#     DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.postgresql',
+#         'NAME': 'affdb',
+#         'USER': 'postgres',
+#         'PASSWORD': 'test123',
+#         'HOST': 'http://178.62.6.45',
+#         'PORT': '5432',
+#     }
+# }
 
 # Password validation
 # https://docs.djangoproject.com/en/2.2/ref/settings/#auth-password-validators

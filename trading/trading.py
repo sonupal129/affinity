@@ -1,6 +1,9 @@
+from multiprocessing.sharedctypes import Value
 import os, fxcmpy, json, logging, requests, schedule
-from socketIO_client.exceptions import ConnectionError
 from fxcmpy.fxcmpy import ServerError
+import os, json, logging, requests, schedule
+from socketIO_client.exceptions import ConnectionError
+from fxcmpy.fxcmpy_open_position import fxcmpy_open_position
 import datetime
 from django.utils import timezone
 # import time as gtime
@@ -27,49 +30,15 @@ class Connection:
 
     def __init__(self):
         self.token = os.getenv("FXCM_TOKEN")
-        self.__connection = None
-      
-
-    @property
-    def connection(self):
-        if self.__connection and self.__connection.is_connected():
-            return self.__connection
-        return self.connect()
-
-    @connection.setter
-    def connection(self, con):
-        if not con.is_subscribed('EUR/USD'):
-            con.subscribe_market_data('EUR/USD')
-            con.set_max_prices(500)
-        self.__connection = con
+        self.connection = None
 
     def connect(self):
         con = fxcmpy.fxcmpy(access_token=TOKEN, log_level=os.getenv("LOG_LEVEL", "error").lower(), \
                             server=os.getenv("SERVER", "demo").lower())
-        sleeper_counter = 0
-        while not con.is_connected():
-            print("Sleeping for 5 seconds")
-            time.sleep(5)
-            if sleeper_counter >= 20:
-                print("Unable to established connection!")
-                break
-            try:
-                con = fxcmpy.fxcmpy(access_token=TOKEN, log_level=os.getenv("LOG_LEVEL", "error").lower(), \
-                                server=os.getenv("SERVER", "demo").lower())
-                print('Connection established with server')
-                print(con)
-                self.connection = con
-                return con
-            except ServerError as sr:
-                print(sr)
-                sleeper_counter += 5
-                continue
-            except Exception as e:
-                print(e)
-                sleeper_counter += 5
-                continue
-        print('Connection established with server')
-        print(con)
+        if con.is_connected():
+            if not con.is_subscribed('EUR/USD'):
+                con.subscribe_market_data('EUR/USD')
+                con.set_max_prices(500)
         self.connection = con
         return con
 
@@ -125,7 +94,7 @@ class OrderBook:
                 return True
             return False
         if exit_signal:
-            print('exit signal details updaing')
+            print('exit signal details updating')
             order = Order.objects.get(order_time=_entry_order.Index)
             if order.has_exit_signal:
                 return False
@@ -133,6 +102,8 @@ class OrderBook:
             order.exit_price = str(order.exit_price)
             order.save()
             return False
+        print("No Condition found for updating/creating a order")
+        return False
             
     @staticmethod
     def jsonize_entry(entry_order):
@@ -156,12 +127,36 @@ class OrderBook:
 
 
 class Trader(object):
-    __connection = Connection().connect()
-
+    
     def __init__(self, **kwargs):
+        self._candle_data = None
+        self.__connection = None
         print("Initiating Connection....")
         for key, value in kwargs.items():
             setattr(self, key, value)
+
+        self.__create_connection__()
+
+    def __create_connection__(self):
+        retry = True
+        retry_counter = 0
+        while retry and retry_counter < 100:
+            try:
+                print("Connecting.........")
+                self.__connection = Connection().connect()
+                break
+            except Exception as e:
+                print("Unable to connect, retrying after 5 seconds")
+                print(e)
+                print("Sleeping before reconnection.......")
+                time.sleep(5)
+                retry_counter += 5
+            
+            if retry_counter > 100:
+                raise ServerError("Unable to connect with server try after sometime with manual request")
+
+    def __reconnect_connection__(self):
+        self.__create_connection__()
     
     def create_order(self, **kwargs):
         last_row = self.__connection.get_last_price('EUR/USD')
@@ -188,9 +183,9 @@ class Trader(object):
 
     def start_entry_trading(self, entry_strategy,  **kwargs):
         entry_signal = FindEntry().find_entry(entry_strategy, **kwargs)
-        order_book = OrderBook()
         order = None
         if entry_signal:
+            order_book = OrderBook()
             print("Latest Entry Signal Data %s" % (entry_signal))
             _entry_signal = next(pd.DataFrame(entry_signal).itertuples())
             last_order = order_book.last_order()
@@ -234,12 +229,28 @@ class Trader(object):
 
     def close_order(self, order_obj, exit_signal:list):
         if not order_obj.has_exit_signal and exit_signal != (0,0,0):
-            order = self.__connection.get_order(order_obj.orderId)
-            tradeId = order.get_tradeId()
-            if order.get_associated_trade() and tradeId:
+            associated_trade = None
+            try:
+                order = self.__connection.get_order(order_obj.orderId)
+                associated_trade = order.get_associated_trade()
+            except ValueError as e:
+                print("Error raised while searching for order for making exit")
+                print(e)
+                positions = self.__connection.get_open_positions()
+                position = positions[positions.orderId == str(order_obj.orderId)]
+                if not position.empty:
+                    position = dict(position.iloc[0])
+                associated_trade = fxcmpy_open_position(self.__connection, position)
+            except Exception as e:
+                print(e)
+                print("Unexpected error arrvied, stopping this function for further debug")
+                
+            
+            tradeId = order_obj.tradeId
+            if associated_trade and tradeId:
                 request_data = {
                     "trade_id": tradeId,
-                    "amount": order.get_associated_trade().get_amount(),
+                    "amount": associated_trade.get_amount(),
                     "order_type": "AtMarket",
                     "time_in_force": "FOK",
                     "rate": exit_signal[0],
@@ -254,7 +265,9 @@ class Trader(object):
     def start_exit_trading(self, exit_strategy, **kwargs):
         order_book = OrderBook()
         open_orders = [order for order in Order.objects.filter(pl_status=None).exclude(tradeId=None) if not order.has_exit_signal]
-        
+        if open_orders:
+            print("Some open orders found for exit trading.....")
+            print(open_orders)
         for order in open_orders:
             if order.orderId:
                 exit_signal = FindExit().find_exit(exit_strategy, order.entry, **kwargs)
@@ -290,22 +303,22 @@ class Trader(object):
                 if start_trading:
                     print("permitted for trading")
                     print("fetching data from server")
-                    try:
-                        df = self.__connection.get_candles('EUR/USD', period='m1', number=250)
-                    except ServerError:
-                        self.__connection = Connection().connect()
-                    except ConnectionError:
-                        self.__connection = Connection().connect()
-                    except Exception:
-                        self.__connection = Connection().connect()
+                    
+                    print("DEBUG")
+                    print(f"connection is connected {self.__connection.is_connected()}")
+                    df = self.__connection.get_candles('EUR/USD', period='m1', number=250)
+                    if df.empty:
+                        print("Expecting connection has been broken, trying to reconnect")
+                        self.__reconnect_connection__()
 
+                    self._candle_data = df
                     print("candles data fetched successfully!")
                     print("last candle: %s" % df.iloc[-1])
+                    
                     self.start_entry_trading(SMAStrategy3Level1, stoploss=self.stoploss, target=self.target, df=df)
                     self.start_exit_trading(SMAExitLevel1, stoploss=self.stoploss, target=self.target, df=df)
             except Exception as e:
                 print(str(e))
-                print(e)
                 print(e)
                 pass
 
@@ -342,6 +355,37 @@ class Trader(object):
                 order.save()
 
 
+    def __create_orders_from_trading_dashboard__(self):
+        try:
+            positions = self.__connection.get_open_positions()
+            if not positions.empty:
+                for i in range(0, len(positions)):
+                    position = positions.iloc[i]
+                    open_position = fxcmpy_open_position(self.__connection, position)
+                    try:
+                        order = Order.objects.get(orderId=position["orderId"])
+                    except:
+                        order = Order.objects.create(orderId=position["orderId"], tradeId=position["tradeId"],\
+                                                    order_time=open_position.get_time())
+                    finally:
+                        if not order.tradeId:
+                            order.tradeId = position["tradeId"]
+                        if order._entry == {}:
+                            data = self._candle_data
+                            candle = data[open_position.get_time() - datetime.timedelta(minutes=1): ].head(1)
+                            if not candle.empty:
+                                serialize_data = candle.to_dict()
+                                order_time = list(serialize_data["bidclose"])[0]
+                                serialize_data["entry_price"] = {order_time: open_position.get_open()}
+                                serialize_data["entry_signal"] = {order_time: "BUY" if open_position.get_isBuy() else "SELL"}
+                                order._entry = OrderBook.jsonize_entry(serialize_data)
+                        order.save()
+        except KeyError:
+            print("Connection broken, trying to reconnect")
+            self.__reconnect_connection__()
+        except Exception as e:
+            print(e)
+
 
 
 # Initialize Trader Class
@@ -353,4 +397,5 @@ trader = Trader(stoploss=0.0005, target=0.0008)
 schedule.every().minute.at(":03").do(trader.start_trading)
 schedule.every(1).minutes.do(trader.__update_trade_detail__)
 schedule.every(2).minutes.do(trader.__delete_none_orders__)
+schedule.every(2).minutes.do(trader.__create_orders_from_trading_dashboard__)
 schedule.every(3).minutes.at(":15").do(trader.__remove_not_executed_orders__)
