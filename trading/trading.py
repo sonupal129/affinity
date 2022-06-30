@@ -6,7 +6,7 @@ from socketIO_client.exceptions import ConnectionError
 from fxcmpy.fxcmpy_open_position import fxcmpy_open_position
 import datetime
 from django.utils import timezone
-from tasks import *
+from trading.tasks import *
 from trading.strategy import SMAExitLevel1, SMAStrategy3Level1
 from trading.models import *
 import pandas as pd
