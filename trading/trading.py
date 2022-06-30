@@ -6,7 +6,7 @@ from socketIO_client.exceptions import ConnectionError
 from fxcmpy.fxcmpy_open_position import fxcmpy_open_position
 import datetime
 from django.utils import timezone
-# import time as gtime
+from tasks import *
 from trading.strategy import SMAExitLevel1, SMAStrategy3Level1
 from trading.models import *
 import pandas as pd
@@ -306,9 +306,19 @@ class Trader(object):
                     
                     print("DEBUG")
                     print(f"connection is connected {self.__connection.is_connected()}")
-                    df = self.__connection.get_candles('EUR/USD', period='m1', number=250)
+                    try:
+                        df = self.__connection.get_candles('EUR/USD', period='m1', number=250)
+                    except ServerError:
+                        message = """:man-shrugging: *Server Connection Broken* :bangbang:\n>Sending new connection request to server.\n>If any *ORDER* is open kindly close it manually or watch it manually"""
+                        send_slack_message.delay(
+                            text=message
+                        )
+                        self.__connection.close()
+                        self.__reconnect_connection__()
+                    
                     if df.empty:
                         print("Expecting connection has been broken, trying to reconnect")
+                        self.__connection.close()
                         self.__reconnect_connection__()
 
                     self._candle_data = df
@@ -394,7 +404,8 @@ trader = Trader(stoploss=0.0005, target=0.0008)
 
 
 # Schedule Tasks
-schedule.every().minute.at(":03").do(trader.start_trading)
+# schedule.every().minute.at(":01").do(trader.start_trading)
+schedule.every(1).minutes.do(trader.start_trading)
 schedule.every(1).minutes.do(trader.__update_trade_detail__)
 schedule.every(2).minutes.do(trader.__delete_none_orders__)
 schedule.every(2).minutes.do(trader.__create_orders_from_trading_dashboard__)

@@ -43,7 +43,8 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'trading',
-    'django_extensions'
+    'django_extensions',
+    'import_export'
 ]
 
 MIDDLEWARE = [
@@ -91,18 +92,6 @@ if not DEBUG or USE_PSQL and env.str("DATABASE_URL", default=None):
     DATABASES = {
         'default': env.db()
     }
-
-# if REMOTE_DB:
-#     DATABASES = {
-#     'default': {
-#         'ENGINE': 'django.db.backends.postgresql',
-#         'NAME': 'affdb',
-#         'USER': 'postgres',
-#         'PASSWORD': 'test123',
-#         'HOST': 'http://178.62.6.45',
-#         'PORT': '5432',
-#     }
-# }
 
 # Password validation
 # https://docs.djangoproject.com/en/2.2/ref/settings/#auth-password-validators
@@ -161,3 +150,17 @@ TOKEN = "5b6de8dc3b260ab0fab6e007bf21c43ee4fc7a27"
 # Trading Settings
 DEFAULT_STOPLOSS = 0.0004
 DEFAULT_TARGET = 0.0008
+
+
+# Celery Settings
+accept_content = ['application/json']
+result_accept_content = ['application/json']
+broker_url='redis://redis:6379'
+CELERY_BROKER_URL='redis://redis:6379'
+result_backend='redis://redis:6379'
+cache_backend='redis://redis:6379'
+
+# Few variable are incorrect will remove later
+
+# SLACK Token
+SLACK_TOKEN = "xoxb-3748931053345-3739327703332-gbF6HWk3dqR7EEhieD6m6Tst"

@@ -1,18 +1,16 @@
-from celery import Celery
-from celery.schedules import crontab
+from affinity import celery_app
+from slack import WebClient
+from django.conf import settings
 
 
 
-app = Celery('tasks', broker='redis://redis:6379')
+# Celery Tasks 
 
-
-# Celery Tasks Schedule
-
-# app.conf.beat_schedule = {
-#     "start_trade": {
-#         'task': 'start_trade',
-#         'schedule': crontab(minute='*/3', day_of_week='mon,tue,wed,thu,fri'),
-#     }
-# }
-
-
+@celery_app.task
+def send_slack_message(channel="#trade_error_notification", message="", attachment=None):
+    sc = WebClient(token=settings.SLACK_TOKEN)
+    response = sc.chat_postMessage(
+            channel=channel,
+            text=message,
+        )
+    return response.get('ok', False)
