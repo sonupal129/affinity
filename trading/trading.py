@@ -330,6 +330,10 @@ class Trader(object):
             except Exception as e:
                 print(str(e))
                 print(e)
+
+                print("Exception DEBUG")
+                print(f"connection is connected {self.__connection.is_connected()}")
+                print(f"socket connection status is  {self.__connection.connection_status}")
                 pass
 
     def __update_trade_detail__(self, **kwargs):
