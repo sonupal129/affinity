@@ -10,21 +10,9 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/2.2/ref/settings/
 """
 
-import os
-import sentry_sdk
-from sentry_sdk.integrations.django import DjangoIntegration
 
-sentry_sdk.init(
-    dsn="https://867ec05df5814e189ab08e34a220c145@o501105.ingest.sentry.io/5581819",
-    integrations=[DjangoIntegration()],
-    # Set traces_sample_rate to 1.0 to capture 100%
-    # of transactions for performance monitoring.
-    # We recommend adjusting this value in production,
-    traces_sample_rate=1.0,
-    # If you wish to associate users to errors (assuming you are using
-    # django.contrib.auth) you may enable sending PII data.
-    send_default_pii=True
-)
+import os, environ
+env = environ.Env()
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -34,10 +22,13 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # See https://docs.djangoproject.com/en/2.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = '=krbtl1oeg2z2#=@e#0eaeg3m4(6sjft50-xqb=)t+7hj+ufl('
+SECRET_KEY = ')_4oed^l^_4ibhrj1m6)(a4#k=k5-l$17qr^%0-8!jo!o$6&ux'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = env.bool("DEBUG", default=True)
+
+USE_PSQL = env.bool("USE_PSQL", default=False)
+REMOTE_DB = env.bool("REMOTE_DB", default=False)
 
 ALLOWED_HOSTS = ["*"]
 
@@ -51,7 +42,9 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'simple_history'
+    'trading',
+    'django_extensions',
+    'import_export'
 ]
 
 MIDDLEWARE = [
@@ -62,7 +55,6 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'simple_history.middleware.HistoryRequestMiddleware',
 ]
 
 ROOT_URLCONF = 'affinity.urls'
@@ -96,6 +88,10 @@ DATABASES = {
     }
 }
 
+if not DEBUG or USE_PSQL and env.str("DATABASE_URL", default=None):
+    DATABASES = {
+        'default': env.db()
+    }
 
 # Password validation
 # https://docs.djangoproject.com/en/2.2/ref/settings/#auth-password-validators
@@ -136,8 +132,35 @@ USE_TZ = True
 STATIC_URL = '/static/'
 
 
+CACHES = {
+    "default": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": "redis://127.0.0.1:6379/1",
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+        }
+    }
+}
 
-try:
-    from .local_settings import *
-except:
-    pass
+
+# FXCM TOKEN
+TOKEN = "5b6de8dc3b260ab0fab6e007bf21c43ee4fc7a27"
+
+
+# Trading Settings
+DEFAULT_STOPLOSS = 0.0004
+DEFAULT_TARGET = 0.0008
+
+
+# Celery Settings
+accept_content = ['application/json']
+result_accept_content = ['application/json']
+broker_url='redis://redis:6379'
+CELERY_BROKER_URL='redis://redis:6379'
+result_backend='redis://redis:6379'
+cache_backend='redis://redis:6379'
+
+# Few variable are incorrect will remove later
+
+# SLACK Token
+SLACK_TOKEN = "xoxb-3748931053345-3739327703332-gbF6HWk3dqR7EEhieD6m6Tst"

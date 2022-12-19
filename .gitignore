@@ -131,3 +131,6 @@ dmypy.json
 
 # Local Settings
 local_settings.py
+
+# Env's
+.env
